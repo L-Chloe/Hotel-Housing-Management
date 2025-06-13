@@ -311,6 +311,8 @@ class HotelManagementSystem:
         ttk.Label(add_room_win, text="价钱(元):").grid(row=2, column=0, padx=5, pady=5, sticky=tk.W)
         price_entry = ttk.Entry(add_room_win)
         price_entry.grid(row=2, column=1, padx=5, pady=5)
+
+        # 清洁状态标签与输入框
         ttk.Label(add_room_win, text="清洁状态:").grid(row=3, column=0, padx=5, pady=5, sticky=tk.W)
         clean_status_entry = ttk.Entry(add_room_win)
         clean_status_entry.grid(row=3, column=1, padx=5, pady=5)
@@ -348,11 +350,11 @@ class HotelManagementSystem:
                     messagebox.showerror("错误", "该房间号已存在")
                     return
 
-                # 插入房间数据（默认状态为"空闲"，清洁状态为"已清洁"）
+                # 插入房间数据，使用用户输入的清洁状态
                 cursor.execute(
                     "INSERT INTO rooms (room_number, room_type, price, status, clean_status) "
-                    "VALUES (?, ?, ?, '空闲', '已清洁')",
-                    (room_number, room_type, price)
+                    "VALUES (?, ?, ?, '空闲', ?)",
+                    (room_number, room_type, price, clean_status)
                 )
                 conn.commit()
                 messagebox.showinfo("成功", "房间添加成功")
@@ -360,7 +362,8 @@ class HotelManagementSystem:
             except Exception as e:
                 messagebox.showerror("错误", f"添加失败：{str(e)}")
             finally:
-                conn.close()
+                if 'conn' in locals():
+                    conn.close()
 
         ttk.Button(add_room_win, text="保存", command=save_room).grid(row=4, column=0, columnspan=2, pady=10)
 
@@ -396,10 +399,14 @@ class HotelManagementSystem:
                     room_type_entry.insert(0, result[0])
                     price_entry.delete(0, tk.END)
                     price_entry.insert(0, result[1])
+                    # 修复：添加清洁状态的填充
+                    clean_status_entry.delete(0, tk.END)
+                    clean_status_entry.insert(0, result[3])
                 else:
                     messagebox.showerror("错误", "未找到该房间号对应的房间")
             finally:
-                conn.close()
+                if 'conn' in locals():
+                    conn.close()
 
         ttk.Button(modify_room_win, text="查询", command=query_room).grid(row=0, column=2, padx=5, pady=5)
 
@@ -412,9 +419,11 @@ class HotelManagementSystem:
         ttk.Label(modify_room_win, text="价钱(元):").grid(row=2, column=0, padx=5, pady=5, sticky=tk.W)
         price_entry = ttk.Entry(modify_room_win)
         price_entry.grid(row=2, column=1, padx=5, pady=5)
+
+        # 清洁状态标签与输入框（可修改）
         ttk.Label(modify_room_win, text="清洁状态:").grid(row=3, column=0, padx=5, pady=5, sticky=tk.W)
-        price_entry = ttk.Entry(modify_room_win)
-        price_entry.grid(row=3, column=1, padx=5, pady=5)
+        clean_status_entry = ttk.Entry(modify_room_win)  # 修正变量名，避免与price_entry冲突
+        clean_status_entry.grid(row=3, column=1, padx=5, pady=5)
 
         def save_modification():
             room_number = room_number_entry.get()
@@ -424,9 +433,11 @@ class HotelManagementSystem:
 
             room_type = room_type_entry.get()
             price = price_entry.get()
+            clean_status = clean_status_entry.get()  # 获取清洁状态
 
-            if not (room_type and price):
-                messagebox.showerror("错误", "房间类型和价钱均为必填项")
+            # 校验所有必填项
+            if not (room_type and price and clean_status):
+                messagebox.showerror("错误", "房间类型、价钱和清洁状态均为必填项")
                 return
 
             try:
@@ -438,10 +449,10 @@ class HotelManagementSystem:
             try:
                 conn = sqlite3.connect('hotel.db')
                 cursor = conn.cursor()
-                # 更新房间信息
+                # 更新房间信息，包括清洁状态
                 cursor.execute(
-                    "UPDATE rooms SET room_type = ?, price = ? WHERE room_number = ?",
-                    (room_type, price, room_number)
+                    "UPDATE rooms SET room_type = ?, price = ?, clean_status = ? WHERE room_number = ?",
+                    (room_type, price, clean_status, room_number)
                 )
                 if cursor.rowcount == 0:
                     messagebox.showerror("错误", "未找到该房间号对应的房间，修改失败")
@@ -452,9 +463,11 @@ class HotelManagementSystem:
             except Exception as e:
                 messagebox.showerror("错误", f"修改失败：{str(e)}")
             finally:
-                conn.close()
+                if 'conn' in locals():
+                    conn.close()
 
-        ttk.Button(modify_room_win, text="保存修改", command=save_modification).grid(row=4, column=0, columnspan=2,pady=10)
+        ttk.Button(modify_room_win, text="保存修改", command=save_modification).grid(row=4, column=0, columnspan=2,
+                                                                                     pady=10)
 
     def view_all_rooms(self):
         # 创建查看房间列表的顶层窗口
@@ -486,7 +499,8 @@ class HotelManagementSystem:
             for row in results:
                 tree.insert('', tk.END, values=row)
         finally:
-            conn.close()
+            if 'conn' in locals():
+                conn.close()
 
 
     # 客户管理相关实现
