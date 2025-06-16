@@ -4,7 +4,7 @@ from tkinter import ttk, messagebox, simpledialog
 import hashlib
 from datetime import datetime, timedelta
 
-import ai4,2
+import ai4,lo
 
 
 # ==== 数据库====
@@ -2258,5 +2258,5 @@ if __name__ == "__main__":
     init_db()
 
     # 启动登录窗口
-    login_window = 2.LoginWindow(start_application)
+    login_window = lo.LoginWindow(start_application)
     login_window.mainloop()
