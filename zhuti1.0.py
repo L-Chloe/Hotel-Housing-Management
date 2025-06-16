@@ -753,18 +753,8 @@ class HotelManagementSystem:
             if not (customer_id.isdigit() and room_number.isdigit()):
                 messagebox.showerror("错误", "客户ID和房间号必须为数字")
                 return
-
-            # 验证日期格式
-            try:
-                datetime.strptime(check_in_date, "%Y-%m-%d")
-                datetime.strptime(check_out_date, "%Y-%m-%d")
-            except ValueError:
-                messagebox.showerror("错误", "日期格式不正确，请使用YYYY-MM-DD格式")
-                return
-
-            # 验证退房日期晚于入住日期
-            if check_out_date <= check_in_date:
-                messagebox.showerror("错误", "退房日期必须晚于入住日期")
+            if not (check_in_date and check_out_date):
+                messagebox.showerror("错误", "入住日期和退房日期不能为空")
                 return
 
             try:
@@ -780,15 +770,6 @@ class HotelManagementSystem:
                 conn = sqlite3.connect('hotel.db')
                 cursor = conn.cursor()
 
-
-                # 检查房间是否存在
-                cursor.execute("SELECT room_number FROM rooms WHERE room_number = ?", (room_number,))
-                if not cursor.fetchone():
-                    messagebox.showerror("错误", "该房间不存在")
-                    return
-
-                # 检查房间状态
-
                 # 检查房间是否存在，修改为查询实际存在的字段，这里用 room_number 示例
                 cursor.execute("SELECT room_number FROM rooms WHERE room_number = ?", (room_number,))
                 room = cursor.fetchone()
@@ -798,31 +779,10 @@ class HotelManagementSystem:
                     return
 
                 # 检查房间状态，假设数据库中“空闲”存的是中文“空闲”
-
                 cursor.execute("SELECT status FROM rooms WHERE room_number = ?", (room_number,))
                 room_status = cursor.fetchone()[0]
                 if room_status != '空闲':
                     messagebox.showerror("错误", f"该房间当前状态为: {room_status}, 不可预订")
-                    return
-
-                # 检查日期冲突
-                cursor.execute("""
-                    SELECT COUNT(*) FROM reservations 
-                    WHERE room_number = ? 
-                    AND (
-                        (check_in_date < ? AND check_out_date > ?) OR  -- 新预订开始日期在已有预订期间
-                        (check_in_date < ? AND check_out_date > ?) OR  -- 新预订结束日期在已有预订期间
-                        (check_in_date >= ? AND check_out_date <= ?)   -- 新预订完全包含在已有预订期间
-                    )
-                """, (room_number,
-                      check_out_date, check_in_date,  # 第一个条件
-                      check_out_date, check_in_date,  # 第二个条件
-                      check_in_date, check_out_date))  # 第三个条件
-
-                conflict_count = cursor.fetchone()[0]
-                if conflict_count > 0:
-                    messagebox.showerror("错误", "该房间在所选日期已被预订")
-                    return
                     conn.close()
                     return
 
@@ -835,7 +795,7 @@ class HotelManagementSystem:
                     cursor.execute("""
                         SELECT COUNT(*) FROM reservations 
                         WHERE room_number = ? 
-                        AND status != 'cancelled'
+                        AND status != '空闲'
                         AND (
                             (check_in_date <= ? AND check_out_date > ?)
                         )
@@ -851,9 +811,8 @@ class HotelManagementSystem:
                 cursor.execute("""
                     INSERT INTO reservations (room_number, customer_id, check_in_date, check_out_date, status)
                     VALUES (?, ?, ?, ?, ?)
-                """, (room_number, customer_id, check_in_date, check_out_date, "已预订"))
+                """, (room_number, customer_id, check_in_date, check_out_date, "reserved"))
 
-                # 更新房间状态
                 # 更新房间状态为已预订（这里根据实际需求，比如改为 '已预订' 等，也得和表结构对应）
                 cursor.execute("UPDATE rooms SET status = '已预订' WHERE room_number = ?", (room_number,))
 
@@ -955,7 +914,7 @@ class HotelManagementSystem:
         ttk.Label(modify_reservation_win, text="状态:").grid(row=6, column=0, padx=5, pady=5, sticky=tk.W)
         status_var = tk.StringVar(value="reserved")
         ttk.Combobox(modify_reservation_win, textvariable=status_var,
-                     values=["reserved", "checked_in", "canceled", "completed"]).grid(row=6, column=1, padx=5, pady=5)
+                     values=["reserved", "checked_in", "空闲", "completed"]).grid(row=6, column=1, padx=5, pady=5)
 
         def save_modification():
             reservation_id = reservation_id_entry.get()
@@ -988,13 +947,12 @@ class HotelManagementSystem:
                 # 如果房间号改变了，需要更新房间状态
                 if original_room_number != int(room_number):
                     # 恢复原房间状态
-                    cursor.execute("UPDATE rooms SET status = 'available' WHERE room_number = ?",
-                                   (original_room_number,))
+                    cursor.execute("UPDATE rooms SET status = '空闲' WHERE room_number = ?", (original_room_number,))
 
                     # 检查新房间是否可用
                     cursor.execute("SELECT status FROM rooms WHERE room_number = ?", (room_number,))
                     new_room_status = cursor.fetchone()
-                    if not new_room_status or new_room_status[0] != "available":
+                    if not new_room_status or new_room_status[0] != "空闲":
                         messagebox.showerror("错误", "新房间不可用")
                         conn.rollback()
                         return
@@ -1041,13 +999,14 @@ class HotelManagementSystem:
             room_number = result[0]
 
             # 更新预订状态
-            cursor.execute("UPDATE reservations SET status = 'canceled' WHERE reservation_id = ?", (reservation_id,))
+            cursor.execute("UPDATE reservations SET status = '空闲' WHERE reservation_id = ?", (reservation_id,))
 
             # 更新房间状态
-            cursor.execute("UPDATE rooms SET status = 'available' WHERE room_number = ?", (room_number,))
+            cursor.execute("UPDATE rooms SET status = '空闲' WHERE room_number = ?", (room_number,))
 
             conn.commit()
             messagebox.showinfo("成功", "预订已取消")
+            conflict_count = 0
         except Exception as e:
             messagebox.showerror("错误", f"取消预订失败: {str(e)}")
         finally:
@@ -1057,7 +1016,7 @@ class HotelManagementSystem:
         # 创建查看预订列表的顶层窗口
         view_reservations_win = tk.Toplevel(self.root)
         view_reservations_win.title("预订列表")
-        view_reservations_win.geometry("1100x500")
+        view_reservations_win.geometry("1200x500")
 
         # 创建树状视图展示预订数据
         tree = ttk.Treeview(view_reservations_win,
@@ -1172,7 +1131,7 @@ class HotelManagementSystem:
                     SELECT r.reservation_id, c.name
                     FROM reservations r
                     JOIN customers c ON r.customer_id = c.customer_id
-                    WHERE r.room_number = ? AND r.customer_id = ? AND r.status = '已预订'
+                    WHERE r.room_number = ? AND r.customer_id = ? AND (r.status = '已预订' or r.status = 'reserved')
                 """, (room, customer))
 
                 reservation = cursor.fetchone()
