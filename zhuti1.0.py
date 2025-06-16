@@ -524,13 +524,29 @@ class HotelManagementSystem:
         ttk.Label(add_customer_win, text="身份证号:").grid(row=2, column=0, padx=5, pady=5, sticky=tk.W)
         id_card_entry = ttk.Entry(add_customer_win)
         id_card_entry.grid(row=2, column=1, padx=5, pady=5)
+
+        def check_id(sid):
+            import re
+            pattern = r'^[1-9]\d{5}(18|19|([23]\d))\d{2}((0[1-9])|(10|11|12))(([0-2][1-9])|10|20|30|31)\d{3}[0-9Xx]$'
+            if re.match(pattern, sid):
+                return True
+            else:
+                return False
+
         def save_customer():
             name = name_entry.get()
             contact = contact_entry.get()
             id_card = id_card_entry.get()
+
             if not (name and contact and id_card):
                 messagebox.showerror("错误", "姓名、联系方式、身份证号均为必填项")
                 return
+
+            if not check_id(id_card):
+                messagebox.showwarning("警告", "请正确输入身份证号！")
+                id_card_entry.delete(0, tk.END)
+                return
+
             try:
                 conn = sqlite3.connect('hotel.db')
                 cursor = conn.cursor()
@@ -658,7 +674,7 @@ class HotelManagementSystem:
 
     def add_reservation(self):
         # 创建添加预订的顶层窗口
-        add_reservation_win = tk.Toplevel(self.root)
+        add_reservation_win = tk.Toplevel(self.root)  # 这里假设类中有 self.root 表示主窗口，若不是这种结构，根据实际情况调整
         add_reservation_win.title("新增预订")
         add_reservation_win.geometry("400x350")
 
@@ -742,11 +758,54 @@ class HotelManagementSystem:
                 return
 
             try:
+                # 解析日期
+                in_date = datetime.strptime(check_in_date, "%Y-%m-%d")
+                out_date = datetime.strptime(check_out_date, "%Y-%m-%d")
+
+                # 检查日期合理性
+                if in_date >= out_date:
+                    messagebox.showerror("错误", "退房日期必须晚于入住日期")
+                    return
+
                 conn = sqlite3.connect('hotel.db')
                 cursor = conn.cursor()
 
-                def check_room_availability(room_number, start_date, end_date=None):
-                    pass
+                # 检查房间是否存在，修改为查询实际存在的字段，这里用 room_number 示例
+                cursor.execute("SELECT room_number FROM rooms WHERE room_number = ?", (room_number,))
+                room = cursor.fetchone()
+                if not room:
+                    messagebox.showerror("错误", "该房间不存在")
+                    conn.close()
+                    return
+
+                # 检查房间状态，假设数据库中“空闲”存的是中文“空闲”
+                cursor.execute("SELECT status FROM rooms WHERE room_number = ?", (room_number,))
+                room_status = cursor.fetchone()[0]
+                if room_status != '空闲':
+                    messagebox.showerror("错误", f"该房间当前状态为: {room_status}, 不可预订")
+                    conn.close()
+                    return
+
+                # 生成入住到退房期间的所有日期
+                date_range = [(in_date + timedelta(days=i)).strftime("%Y-%m-%d")
+                              for i in range((out_date - in_date).days)]
+
+                # 检查每一天是否已有预订
+                for date in date_range:
+                    cursor.execute("""
+                        SELECT COUNT(*) FROM reservations 
+                        WHERE room_number = ? 
+                        AND status != 'cancelled'
+                        AND (
+                            (check_in_date <= ? AND check_out_date > ?)
+                        )
+                    """, (room_number, date, date))
+
+                    conflict_count = cursor.fetchone()[0]
+                    if conflict_count > 0:
+                        messagebox.showerror("错误", f"该房间在 {date} 已有预订，无法重复预订")
+                        conn.close()
+                        return
 
                 # 添加预订
                 cursor.execute("""
@@ -754,19 +813,26 @@ class HotelManagementSystem:
                     VALUES (?, ?, ?, ?, ?)
                 """, (room_number, customer_id, check_in_date, check_out_date, "reserved"))
 
-                # 更新房间状态
-                cursor.execute("UPDATE rooms SET status = 'reserved' WHERE room_number = ?", (room_number,))
+                # 更新房间状态为已预订（这里根据实际需求，比如改为 '已预订' 等，也得和表结构对应）
+                cursor.execute("UPDATE rooms SET status = '已预订' WHERE room_number = ?", (room_number,))
 
                 conn.commit()
                 messagebox.showinfo("成功", "预订添加成功")
                 add_reservation_win.destroy()
+                conn.close()
+            except ValueError as ve:
+                messagebox.showerror("错误", f"日期格式错误: {str(ve)}")
+                if 'conn' in locals():
+                    conn.close()
             except Exception as e:
                 messagebox.showerror("错误", f"添加预订失败: {str(e)}")
-            finally:
-                conn.close()
+                if 'conn' in locals():
+                    conn.close()
 
-        ttk.Button(add_reservation_win, text="保存", command=save_reservation).grid(row=6, column=0, columnspan=3,
-                                                                                    pady=10)
+                    # 新增“保存”按钮，绑定 save_reservation 函数
+
+        save_btn = ttk.Button(add_reservation_win, text="保存", command=save_reservation)
+        save_btn.grid(row=6, column=0, columnspan=3, pady=10)
 
     def modify_reservation(self):
         # 创建修改预订的顶层窗口
