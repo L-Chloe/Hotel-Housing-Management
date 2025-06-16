@@ -7,7 +7,7 @@ from tkinter import *
 from PIL import Image, ImageTk
 
 
-# ==== LoginWindow  ====
+# ==== LoginWindow ====
 class LoginWindow(tk.Tk):
     def __init__(self, login_callback):
         super().__init__()
@@ -15,9 +15,27 @@ class LoginWindow(tk.Tk):
         self.geometry("400x300")
         self.resizable(False, False)
         self.login_callback = login_callback
-        # 设置窗口背景和主题色
-        self.configure(bg="#f0f0f0")
-        # 创建主框架，采用圆角边框设计
+
+        # 加载背景图片
+        try:
+            # 尝试加载背景图片
+            background_image = Image.open("1.jpg")
+            # 调整图片大小以适应窗口
+            background_image = background_image.resize((400, 300), Image.ANTIALIAS)
+            self.background_photo = ImageTk.PhotoImage(background_image)
+
+            # 创建背景标签
+            background_label = tk.Label(self, image=self.background_photo)
+            background_label.place(x=0, y=0, relwidth=1, relheight=1)
+
+            # 设置透明背景
+            self.configure(bg='white')
+        except Exception as e:
+            # 如果图片加载失败，使用默认背景色
+            self.configure(bg="#f0f0f0")
+
+        # 创建主框架...
+        # 以下代码保持不变...
         style = ttk.Style()
         style.configure("TFrame", background="#f0f0f0")
         style.configure("TLabel", background="#f0f0f0", font=("Arial", 10))
@@ -73,7 +91,8 @@ class LoginWindow(tk.Tk):
         login_btn.pack()
 
         # 版权信息，使用更精致的字体
-        ttk.Label(self, text="© 2025 酒店住房管理系统", style="Footer.TLabel").place(relx=0.5, rely=0.95, anchor="center")
+        ttk.Label(self, text="© 2025 酒店住房管理系统", style="Footer.TLabel").place(relx=0.5, rely=0.95,
+                                                                                     anchor="center")
 
     def login(self):
         username = self.username_var.get()
@@ -107,3 +126,4 @@ class LoginWindow(tk.Tk):
 
     def hash_password(self, password):
         return hashlib.sha256(password.encode()).hexdigest()
+
