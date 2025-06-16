@@ -473,7 +473,7 @@ class HotelManagementSystem:
         # 创建查看房间列表的顶层窗口
         view_rooms_win = tk.Toplevel(self.root)
         view_rooms_win.title("房间列表")
-        view_rooms_win.geometry("600x400")
+        view_rooms_win.geometry("1000x600")
 
         # 创建树状视图展示房间数据
         tree = ttk.Treeview(view_rooms_win, columns=("房间号", "房间类型", "价钱", "状态", "清洁状态"),
@@ -645,7 +645,7 @@ class HotelManagementSystem:
         # 创建查看客户列表的顶层窗口
         view_customers_win = tk.Toplevel(self.root)
         view_customers_win.title("客户列表")
-        view_customers_win.geometry("600x400")
+        view_customers_win.geometry("1000x400")
 
         # 创建树状视图展示客户数据
         tree = ttk.Treeview(view_customers_win, columns=("客户ID", "姓名", "联系方式", "身份证号", "积分"),
@@ -780,7 +780,7 @@ class HotelManagementSystem:
                 conn = sqlite3.connect('hotel.db')
                 cursor = conn.cursor()
 
-<<<<<<< HEAD
+
                 # 检查房间是否存在
                 cursor.execute("SELECT room_number FROM rooms WHERE room_number = ?", (room_number,))
                 if not cursor.fetchone():
@@ -788,7 +788,7 @@ class HotelManagementSystem:
                     return
 
                 # 检查房间状态
-=======
+
                 # 检查房间是否存在，修改为查询实际存在的字段，这里用 room_number 示例
                 cursor.execute("SELECT room_number FROM rooms WHERE room_number = ?", (room_number,))
                 room = cursor.fetchone()
@@ -798,12 +798,11 @@ class HotelManagementSystem:
                     return
 
                 # 检查房间状态，假设数据库中“空闲”存的是中文“空闲”
->>>>>>> c0ff000d874d48c57694a3b8b650c9767dac1126
+
                 cursor.execute("SELECT status FROM rooms WHERE room_number = ?", (room_number,))
                 room_status = cursor.fetchone()[0]
                 if room_status != '空闲':
                     messagebox.showerror("错误", f"该房间当前状态为: {room_status}, 不可预订")
-<<<<<<< HEAD
                     return
 
                 # 检查日期冲突
@@ -824,7 +823,6 @@ class HotelManagementSystem:
                 if conflict_count > 0:
                     messagebox.showerror("错误", "该房间在所选日期已被预订")
                     return
-=======
                     conn.close()
                     return
 
@@ -848,7 +846,6 @@ class HotelManagementSystem:
                         messagebox.showerror("错误", f"该房间在 {date} 已有预订，无法重复预订")
                         conn.close()
                         return
->>>>>>> c0ff000d874d48c57694a3b8b650c9767dac1126
 
                 # 添加预订
                 cursor.execute("""
@@ -856,11 +853,8 @@ class HotelManagementSystem:
                     VALUES (?, ?, ?, ?, ?)
                 """, (room_number, customer_id, check_in_date, check_out_date, "已预订"))
 
-<<<<<<< HEAD
                 # 更新房间状态
-=======
                 # 更新房间状态为已预订（这里根据实际需求，比如改为 '已预订' 等，也得和表结构对应）
->>>>>>> c0ff000d874d48c57694a3b8b650c9767dac1126
                 cursor.execute("UPDATE rooms SET status = '已预订' WHERE room_number = ?", (room_number,))
 
                 conn.commit()
@@ -1063,7 +1057,7 @@ class HotelManagementSystem:
         # 创建查看预订列表的顶层窗口
         view_reservations_win = tk.Toplevel(self.root)
         view_reservations_win.title("预订列表")
-        view_reservations_win.geometry("800x500")
+        view_reservations_win.geometry("1100x500")
 
         # 创建树状视图展示预订数据
         tree = ttk.Treeview(view_reservations_win,
@@ -1613,7 +1607,7 @@ class HotelManagementSystem:
         """查看所有交易记录"""
         transactions_window = tk.Toplevel(self.root)
         transactions_window.title("交易记录")
-        transactions_window.geometry("900x600")
+        transactions_window.geometry("1000x600")
         transactions_window.transient(self.root)
 
         # 创建主框架
