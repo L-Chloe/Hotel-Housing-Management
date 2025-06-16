@@ -1054,8 +1054,7 @@ class HotelManagementSystem:
 
         ttk.Label(filter_frame, text="状态筛选:").pack(side=tk.LEFT, padx=5)
         status_var = tk.StringVar(value="all")
-        status_combo = ttk.Combobox(filter_frame, textvariable=status_var,
-                                    values=["all", "reserved", "checked_in", "canceled", "completed"])
+        status_combo = ttk.Combobox(filter_frame, textvariable=status_var,values=["all", "reserved", "已入住", "空闲", "completed"])
         status_combo.pack(side=tk.LEFT, padx=5)
 
         def load_reservations():
@@ -2365,6 +2364,7 @@ if __name__ == "__main__":
         root = tk.Tk()
         app = HotelManagementSystem(root, user)
         root.mainloop()
+        print(f"登录成功: {user}")
 
     # 初始化数据库
     init_db()
