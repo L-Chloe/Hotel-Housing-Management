@@ -737,25 +737,64 @@ class HotelManagementSystem:
             if not (customer_id.isdigit() and room_number.isdigit()):
                 messagebox.showerror("错误", "客户ID和房间号必须为数字")
                 return
-            if not (check_in_date and check_out_date):
-                messagebox.showerror("错误", "入住日期和退房日期不能为空")
+
+            # 验证日期格式
+            try:
+                datetime.strptime(check_in_date, "%Y-%m-%d")
+                datetime.strptime(check_out_date, "%Y-%m-%d")
+            except ValueError:
+                messagebox.showerror("错误", "日期格式不正确，请使用YYYY-MM-DD格式")
+                return
+
+            # 验证退房日期晚于入住日期
+            if check_out_date <= check_in_date:
+                messagebox.showerror("错误", "退房日期必须晚于入住日期")
                 return
 
             try:
                 conn = sqlite3.connect('hotel.db')
                 cursor = conn.cursor()
 
-                def check_room_availability(room_number, start_date, end_date=None):
-                    pass
+                # 检查房间是否存在
+                cursor.execute("SELECT room_number FROM rooms WHERE room_number = ?", (room_number,))
+                if not cursor.fetchone():
+                    messagebox.showerror("错误", "该房间不存在")
+                    return
+
+                # 检查房间状态
+                cursor.execute("SELECT status FROM rooms WHERE room_number = ?", (room_number,))
+                room_status = cursor.fetchone()[0]
+                if room_status != '空闲':
+                    messagebox.showerror("错误", f"该房间当前状态为: {room_status}, 不可预订")
+                    return
+
+                # 检查日期冲突
+                cursor.execute("""
+                    SELECT COUNT(*) FROM reservations 
+                    WHERE room_number = ? 
+                    AND (
+                        (check_in_date < ? AND check_out_date > ?) OR  -- 新预订开始日期在已有预订期间
+                        (check_in_date < ? AND check_out_date > ?) OR  -- 新预订结束日期在已有预订期间
+                        (check_in_date >= ? AND check_out_date <= ?)   -- 新预订完全包含在已有预订期间
+                    )
+                """, (room_number,
+                      check_out_date, check_in_date,  # 第一个条件
+                      check_out_date, check_in_date,  # 第二个条件
+                      check_in_date, check_out_date))  # 第三个条件
+
+                conflict_count = cursor.fetchone()[0]
+                if conflict_count > 0:
+                    messagebox.showerror("错误", "该房间在所选日期已被预订")
+                    return
 
                 # 添加预订
                 cursor.execute("""
                     INSERT INTO reservations (room_number, customer_id, check_in_date, check_out_date, status)
                     VALUES (?, ?, ?, ?, ?)
-                """, (room_number, customer_id, check_in_date, check_out_date, "reserved"))
+                """, (room_number, customer_id, check_in_date, check_out_date, "已预订"))
 
                 # 更新房间状态
-                cursor.execute("UPDATE rooms SET status = 'reserved' WHERE room_number = ?", (room_number,))
+                cursor.execute("UPDATE rooms SET status = '已预订' WHERE room_number = ?", (room_number,))
 
                 conn.commit()
                 messagebox.showinfo("成功", "预订添加成功")
@@ -1031,50 +1070,96 @@ class HotelManagementSystem:
         load_reservations()
 
     def check_in(self):
-        """简化版办理入住"""
+        """办理入住 - 需预订房间号和客户ID匹配"""
         win = tk.Toplevel(self.root)
         win.title("办理入住")
+        win.geometry("350x200")
 
-        # 房间选择
-        ttk.Label(win, text="房间号:").grid(row=0, column=0)
+        # 房间号输入
+        ttk.Label(win, text="房间号:").grid(row=0, column=0, padx=5, pady=5)
         room_entry = ttk.Entry(win)
-        room_entry.grid(row=0, column=1)
+        room_entry.grid(row=0, column=1, padx=5, pady=5)
+        room_entry.focus()
 
-        # 客户ID
-        ttk.Label(win, text="客户ID:").grid(row=1, column=0)
+        # 客户ID输入
+        ttk.Label(win, text="客户ID:").grid(row=1, column=0, padx=5, pady=5)
         customer_entry = ttk.Entry(win)
-        customer_entry.grid(row=1, column=1)
+        customer_entry.grid(row=1, column=1, padx=5, pady=5)
 
-        def confirm():
+        def validate_booking():
+            """验证预订信息是否匹配"""
             room = room_entry.get()
             customer = customer_entry.get()
 
-            if not room or not customer:
-                messagebox.showerror("错误", "请填写房间号和客户ID")
-                return
+            if not (room and customer):
+                messagebox.showerror("错误", "房间号和客户ID不能为空")
+                return False
 
             try:
                 conn = sqlite3.connect('hotel.db')
                 cursor = conn.cursor()
 
-                # 更新房间状态
-                cursor.execute("UPDATE rooms SET status='已入住' WHERE room_number=?", (room,))
-
-                # 更新预订状态（如果有）
+                # 检查是否存在匹配的预订（房间号、客户ID、状态为"已预订"）
                 cursor.execute("""
-                    UPDATE reservations SET status='已入住' 
-                    WHERE room_number=? AND customer_id=?
+                    SELECT r.reservation_id, c.name
+                    FROM reservations r
+                    JOIN customers c ON r.customer_id = c.customer_id
+                    WHERE r.room_number = ? AND r.customer_id = ? AND r.status = '已预订'
                 """, (room, customer))
 
-                conn.commit()
-                messagebox.showinfo("成功", f"房间 {room} 入住成功")
-                win.destroy()
+                reservation = cursor.fetchone()
+                if not reservation:
+                    messagebox.showerror("错误", "未找到匹配的预订记录\n请确认房间号和客户ID是否正确")
+                    return False
+
+                reservation_id, customer_name = reservation
+                messagebox.showinfo("验证成功", f"已找到匹配预订\n预订ID: {reservation_id}\n客户: {customer_name}")
+                return True
+
             except Exception as e:
-                messagebox.showerror("错误", f"入住失败: {str(e)}")
+                messagebox.showerror("错误", f"验证预订失败: {str(e)}")
+                return False
             finally:
                 conn.close()
 
-        ttk.Button(win, text="确认入住", command=confirm).grid(row=2, columnspan=2)
+        def confirm_check_in():
+            """确认入住，仅当预订验证通过时执行"""
+            if not validate_booking():
+                return
+
+            room = room_entry.get()
+            customer = customer_entry.get()
+
+            try:
+                conn = sqlite3.connect('hotel.db')
+                cursor = conn.cursor()
+
+                # 检查房间状态是否为"已预订"
+                cursor.execute("SELECT status FROM rooms WHERE room_number=?", (room,))
+                room_status = cursor.fetchone()
+                if not room_status or room_status[0] != "已预订":
+                    messagebox.showerror("错误", f"房间{room}状态异常，无法办理入住")
+                    return
+
+                # 更新房间状态为"已入住"
+                cursor.execute("UPDATE rooms SET status='已入住' WHERE room_number=?", (room,))
+
+                # 更新预订状态为"已入住"
+                cursor.execute("UPDATE reservations SET status='已入住' WHERE room_number=? AND customer_id=?",
+                               (room, customer))
+
+                conn.commit()
+                messagebox.showinfo("成功", f"房间{room}入住成功\n客户ID: {customer}")
+                win.destroy()
+
+            except Exception as e:
+                messagebox.showerror("错误", f"入住失败：{str(e)}")
+            finally:
+                conn.close()
+
+        # 按钮区域
+        ttk.Button(win, text="验证预订", command=validate_booking).grid(row=2, column=0, padx=5, pady=10)
+        ttk.Button(win, text="确认入住", command=confirm_check_in).grid(row=2, column=1, padx=5, pady=10)
 
     def check_out(self):
         """简化版办理退房"""
