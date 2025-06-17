@@ -1052,9 +1052,9 @@ class HotelManagementSystem:
         filter_frame = ttk.Frame(view_reservations_win)
         filter_frame.pack(fill=tk.X, padx=5, pady=5)
 
-        ttk.Label(filter_frame, text="状态筛选:").pack(side=tk.LEFT, padx=5)
+        ttk.Label(filter_frame, text="").pack(side=tk.LEFT, padx=5)
         status_var = tk.StringVar(value="all")
-        status_combo = ttk.Combobox(filter_frame, textvariable=status_var,values=["all", "reserved", "已入住", "空闲", "completed"])
+        status_combo = ttk.Combobox()
         status_combo.pack(side=tk.LEFT, padx=5)
 
         def load_reservations():
@@ -1090,7 +1090,6 @@ class HotelManagementSystem:
             finally:
                 conn.close()
 
-        ttk.Button(filter_frame, text="筛选", command=load_reservations).pack(side=tk.LEFT, padx=5)
 
         # 初始加载数据
         load_reservations()
